@@ -55,9 +55,9 @@ def get_validation_list(train_dir):
     with open(train_dir+"/validation_list.txt") as val_list:
         validation_list = [row[0] for row in csv.reader(val_list)]
     assert len(validation_list) == 6835, "testing files not loaded"
-    for i, file in enumerate(os.listdir(train_dir+"audio/silence/")):
+    for i, file in enumerate(os.listdir(train_dir+"/audio/silence/")):
         if i%10 == 0:
-            validation_list.append("audio/silence/"+file)
+            validation_list.append("silence/"+file)
     return validation_list
 
 def get_test_val_lists(train_dir, validation_list):
@@ -74,8 +74,8 @@ def get_test_val_lists(train_dir, validation_list):
                 training_list.append(folder+'/'+f)
             class_counts[folder] = i
 
-    validation_list = list(set(validation_list).intersection(all_files_list))
-    return validation_list, training_list
+    # validation_list = list(set(validation_list).intersection(all_files_list))
+    return training_list
 def get_all_classes(train_dir):
     
     classes = os.listdir(os.path.join(train_dir,'audio'))
