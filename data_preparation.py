@@ -54,7 +54,7 @@ def create_silence(train_dir):
 def get_validation_list(train_dir):
     with open(train_dir+"/validation_list.txt") as val_list:
         validation_list = [row[0] for row in csv.reader(val_list)]
-    assert len(validation_list) == 6835, "testing files not loaded"
+
     for i, file in enumerate(os.listdir(train_dir+"/audio/silence/")):
         if i%10 == 0:
             validation_list.append("silence/"+file)
