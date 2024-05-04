@@ -24,7 +24,7 @@ def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer,
     
     dataloader_train = DataLoader(train_data, batch_size = batch_size, shuffle = True, generator = generator, num_workers = NUM_WORKERS)
 
-    model, total_loss_all = run_network(model = model, 
+    model, total_loss_all, accs = run_network(model = model, 
                                         optimizer = optimizer, 
                                         criterion = criterion, 
                                         dataloader = dataloader_train,
@@ -40,34 +40,38 @@ def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer,
     if should_print:
         print_err(total_loss_all)
         
-        print("Train eval:")
-        evaluate(model = model, dataset = train_data, device = device, all_classes = all_classes, trans_mode = trans_mode)
+        # print("Train eval:")
+        # evaluate(model = model, dataset = train_data, device = device, all_classes = all_classes, trans_mode = trans_mode)
         
         print("Test eval:")
-        evaluate(model = model, dataset = test_data, device = device, all_classes = all_classes, trans_mode = trans_mode)
+        _, _, acc = evaluate(model = model, dataset = test_data, device = device, all_classes = all_classes, trans_mode = trans_mode)
+        accs.append(acc)
+
+        plot_accs(accs)
         
         
-    return model   
+    return model,
 
 def run_network(model, criterion, optimizer, dataloader, num_epochs, device, scheduler, valid_data, all_classes, trans_mode, should_print = True, test_frequency = 1):
     total_loss = []
+    accs = []
     model.train()
 
     for epoch in range(num_epochs):
         model.train()
         loss = 0
     
-        for images, labels in dataloader:
+        for inputs, labels in dataloader:
             if(trans_mode):
                 inputs = inputs.permute(0, 2, 1)
 
             if device == torch.device('cuda'):
-                images = images.cuda()
+                inputs = inputs.cuda()
                 labels = labels.cuda()
 
             optimizer.zero_grad()
             
-            outputs = model(images)
+            outputs = model(inputs)
 
             if(trans_mode):
                 labels = labels.long()
@@ -86,9 +90,12 @@ def run_network(model, criterion, optimizer, dataloader, num_epochs, device, sch
             print(f"Epoch [{epoch+1}/{num_epochs}], Train loss: {loss / len(dataloader):.4f}")
 
             if (epoch + 1) % test_frequency == 0 and (epoch + 1) < num_epochs:
-                evaluate(model = model, dataset = valid_data, device = device, long_mode = False, all_classes = all_classes, trans_mode = trans_mode)
+                _, _, acc = evaluate(model = model, dataset = valid_data, device = device, long_mode = False, all_classes = all_classes, trans_mode = trans_mode)
+                accs.append(acc)
+                print(f"Test accuracy: {acc}")
+                
         
-    return model, total_loss
+    return model, total_loss, accs
 
 def print_err(total_loss):
     total_loss_c = []
@@ -109,22 +116,22 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
     y_true = []
     y_pred = []
     with torch.no_grad():
-        for images, labels in dataloader:
+        for inputs, labels in dataloader:
             if(trans_mode):
                 inputs = inputs.permute(0, 2, 1)
 
             if device == torch.device('cuda'):
-                images = images.cuda()
+                inputs = inputs.cuda()
                 labels = labels.cuda()
 
-            outputs = model(images)
+            outputs = model(inputs)
 
-            images = images.cpu()
+            inputs = inputs.cpu()
             labels = labels.cpu()
             outputs = outputs.cpu()
 
             if(trans_mode):
-                _, outputs = torch.max(torch.tensor(outputs), 1)
+                _, outputs = torch.max(outputs, 1)
 
             _, predicted = torch.max(outputs, 1)
             y_true.extend(labels.numpy())
@@ -142,6 +149,7 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
 
     #target_names = [CLASSES[cls] for cls in range(12)]
 
+    acc = accuracy_score(y_true = y_true, y_pred = y_pred)
     if long_mode:
         print(classification_report(y_true = y_true, 
                                     y_pred = y_pred, 
@@ -152,64 +160,16 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
             
         disp = ConfusionMatrixDisplay(confusion_matrix = cm, #display_labels = target_names
                                       )
-        disp.plot()
-    else:
-        acc = accuracy_score(y_true = y_true, y_pred = y_pred)
-        print(f"Test accuracy: {acc}")
+        disp.plot()  
         
-    return y_pred, y_true
+    return y_pred, y_true, acc
 
+def plot_accs(accs):
+    epochs = range(1, len(accs) + 1)
 
-# # compute mean for dataset
-# def compute_mean(dataset):
-#     dataloader = torch.utils.data.DataLoader(dataset, batch_size = 1, num_workers = NUM_WORKERS)
-#     mean = torch.zeros(3)
-#     for image, _ in dataloader:
-#         for i in range(3):
-#             mean[i] += image[:, i, :, :].mean()
-#     mean.div_(len(dataset))
-#     return mean
-
-# # compute std for dataset
-# def compute_std(dataset):
-#     dataloader = torch.utils.data.DataLoader(dataset, batch_size = 1, num_workers = NUM_WORKERS)
-#     std = torch.zeros(3)
-#     for image, _ in dataloader:
-#         for i in range(3):
-#             std[i] += image[:, i, :, :].std()
-#     std.div_(len(dataset))
-#     return std
-
-
-# from torchvision import transforms
-# from torchvision.datasets import DatasetFolder
-
-# def compute_norm_stats(train_dir, valid_dir, ratio):
-#     transform = transforms.Compose([
-#         transforms.ToTensor(), 
-#     ])
-
-#     # adding train and valid data to one dataset and them splitting them again with a new ratio
-#     dataset1 = DatasetFolder(root = train_dir, 
-#                             loader = image_loader, 
-#                             transform = transform,
-#                             extensions='.png')
-
-#     dataset2 = DatasetFolder(root = valid_dir, 
-#                             loader = image_loader, 
-#                             transform = transform,
-#                             extensions='.png')
-
-#     train_valid_datasets = torch.utils.data.ConcatDataset([dataset1, dataset2])
-
-#     generator = torch.Generator().manual_seed(RANDOM_SEED)
-        
-#     # splitting data
-#     train_size = int(ratio * len(train_valid_datasets))
-#     valid_size = len(train_valid_datasets) - train_size
-#     pre_train_data, _ = torch.utils.data.random_split(train_valid_datasets, [train_size, valid_size], generator = generator)
-
-#     std_train = compute_std(pre_train_data)
-#     mean_train = compute_mean(pre_train_data)
-
-#     return mean_train, std_train
+    plt.plot(epochs, accs, 'bo', label='Training accuracy')
+    plt.title('Training Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.show()

@@ -5,7 +5,7 @@ import torch.nn as nn
 from torchaudio.models import Emformer
 
 class EmformerClassifier(nn.Module):
-    def __init__(self, num_classes, input_length = 122, input_dim = 85, num_heads = 5, ffn_dim = 512, num_layers = 8, segment_length = 4, dropout = 0):
+    def __init__(self, num_classes, input_length, input_dim, num_heads = 5, ffn_dim = 256, num_layers = 4, segment_length = 4, dropout = 0):
         super(EmformerClassifier, self).__init__()
         self.input_length = input_length
 
