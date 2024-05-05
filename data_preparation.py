@@ -76,7 +76,6 @@ def get_validation_list(train_dir):
 
 def get_test_val_lists(train_dir, validation_list):
     training_list  = []
-    class_counts = {}
     folders = os.listdir(train_dir+"/audio")
     for folder in folders:        
         files = os.listdir(os.path.join(train_dir,'audio',folder))
@@ -84,7 +83,6 @@ def get_test_val_lists(train_dir, validation_list):
             path = folder+'/'+f
             if path not in validation_list:
                 training_list.append(folder+'/'+f)
-            class_counts[folder] = i
 
     return training_list
 
