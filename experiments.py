@@ -130,29 +130,32 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
             y_pred.extend(predicted.numpy())
 
     # converting classes
-    # class_dict = dict(all_classes)
-    # y_true = np.array([class_dict[num] if class_dict.get(num) in VAL_CLASSES else "unknown" for num in y_true])
-    # y_pred = np.array([class_dict[num] if class_dict.get(num) in VAL_CLASSES else "unknown" for num in y_pred])
+    class_dict = dict(all_classes)
 
-    # class_to_number = {class_name: i for i, class_name in enumerate(CLASSES)}
+    for key, value in all_classes.items():
+        if value not in VAL_CLASSES:
+            all_classes[key] = "unknown"
+    
+    y_true = np.array([class_dict[round(num)] for num in y_true])
+    y_pred = np.array([class_dict[round(num)] for num in y_pred])
 
-    # y_true = np.array([class_to_number[class_dict[num]] if class_dict.get(num) in CLASSES else -1 for num in y_true])
-    # y_pred = np.array([class_to_number[class_dict[num]] if class_dict.get(num) in CLASSES else -1 for num in y_pred])
+    y_true = [CLASSES.index(name) for name in y_true]
+    y_pred = [CLASSES.index(name) for name in y_pred]
 
-    #target_names = [CLASSES[cls] for cls in range(12)]
+
+    target_names = [CLASSES[cls] for cls in range(12)]
 
     acc = accuracy_score(y_true = y_true, y_pred = y_pred)
     if long_mode:
         print(classification_report(y_true = y_true, 
                                     y_pred = y_pred, 
-                                    #target_names = target_names,
+                                    target_names = target_names,
                                     digits=4))
 
         cm = confusion_matrix(y_true = y_true, y_pred = y_pred)
             
-        disp = ConfusionMatrixDisplay(confusion_matrix = cm, #display_labels = target_names
-                                      )
-        disp.plot()  
+        disp = ConfusionMatrixDisplay(confusion_matrix = cm, display_labels = target_names)
+        disp.plot(xticks_rotation = 'vertical')  
         
     return y_pred, y_true, acc
 
