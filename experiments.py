@@ -6,6 +6,9 @@ from sklearn.metrics import classification_report, confusion_matrix, ConfusionMa
 
 import torch
 from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
+
+import csv
 
 RANDOM_SEED = 17
 NUM_WORKERS = 0
@@ -164,6 +167,56 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
         plt.show()
         
     return y_pred, y_true, acc
+
+def evaluate_test(model, dataset, device, all_classes, trans_mode=False):
+    dataloader = DataLoader(dataset, batch_size = 100, num_workers = NUM_WORKERS)
+    model.eval()
+    y_pred = []
+    
+       # converting classes
+    for key, value in all_classes.items():
+        if value not in VAL_CLASSES:
+            all_classes[key] = "unknown"
+            
+    with open('outputs/output.csv', 'w', newline='') as csvfile:
+        
+        fieldnames = ['fname', 'label']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()       
+         
+        with torch.no_grad():
+            for inputs, file_names in dataloader:
+                if(trans_mode):
+                    inputs = inputs.permute(0, 2, 1)
+
+                if device == torch.device('cuda'):
+                    inputs = inputs.cuda()
+                    
+                outputs = model(torch.tensor(inputs).float().transpose(2, 1))
+
+                outputs = outputs.cpu()
+
+                _, predicted = torch.max(outputs, 1)
+                
+                predicted = predicted.numpy()
+                
+                for num,file_name in zip(predicted,file_names):
+                    predicted_word = all_classes[num]
+                    y_pred.append(predicted_word)
+                    writer.writerow({'fname': file_name, 'label': predicted_word})
+            
+    return y_pred
+
+class CustomDataset(Dataset):
+    def __init__(self, X, file_names):
+        self.X = X
+        self.file_names = file_names
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.file_names[idx]
 
 def plot_accs(accs):
     epochs = range(1, len(accs) + 1)
