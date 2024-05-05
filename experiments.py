@@ -17,7 +17,7 @@ CLASSES = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go'
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
-def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer, batch_size, all_classes, device, scheduler = None, should_print = True, random_seed=RANDOM_SEED, trans_mode = False):
+def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer, batch_size, all_classes, device, scheduler = None, should_print = True, random_seed=RANDOM_SEED, trans_mode = False, transform = []):
     generator = torch.Generator().manual_seed(random_seed)
     random.seed(random_seed)
     torch.manual_seed(random_seed)
@@ -34,7 +34,9 @@ def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer,
                                         device = device,
                                         valid_data = test_data,
                                         scheduler = scheduler,
-                                        trans_mode = trans_mode)
+                                        trans_mode = trans_mode,
+                                        transform = transform,
+                                        )
     
     # evaluating model
     if should_print:
@@ -49,7 +51,7 @@ def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer,
         
     return model,
 
-def run_network(model, criterion, optimizer, dataloader, num_epochs, device, scheduler, valid_data, all_classes, trans_mode, should_print = True, test_frequency = 1):
+def run_network(model, criterion, optimizer, dataloader, num_epochs, device, scheduler, valid_data, all_classes, trans_mode, transform, should_print = True, test_frequency = 1):
     total_loss = []
     accs = []
     model.train()
@@ -61,6 +63,10 @@ def run_network(model, criterion, optimizer, dataloader, num_epochs, device, sch
         for inputs, labels in dataloader:
             if(trans_mode):
                 inputs = inputs.permute(0, 2, 1)
+
+            if transform:
+                for tr in transform:
+                    inputs = tr(inputs)
 
             if device == torch.device('cuda'):
                 inputs = inputs.cuda()
