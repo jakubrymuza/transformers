@@ -130,18 +130,16 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
             y_pred.extend(predicted.numpy())
 
     # converting classes
-    class_dict = dict(all_classes)
-
     for key, value in all_classes.items():
         if value not in VAL_CLASSES:
             all_classes[key] = "unknown"
+
     
-    y_true = np.array([class_dict[round(num)] for num in y_true])
-    y_pred = np.array([class_dict[round(num)] for num in y_pred])
+    y_true = np.array([all_classes[round(num)] for num in y_true])
+    y_pred = np.array([all_classes[round(num)] for num in y_pred])
 
     y_true = [CLASSES.index(name) for name in y_true]
     y_pred = [CLASSES.index(name) for name in y_pred]
-
 
     target_names = [CLASSES[cls] for cls in range(12)]
 
@@ -156,15 +154,16 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
             
         disp = ConfusionMatrixDisplay(confusion_matrix = cm, display_labels = target_names)
         disp.plot(xticks_rotation = 'vertical')  
+        plt.title('Confusion Matrix')
+        plt.show()
         
     return y_pred, y_true, acc
 
 def plot_accs(accs):
     epochs = range(1, len(accs) + 1)
 
-    plt.plot(epochs, accs, 'bo')
+    plt.plot(epochs, accs)
     plt.title('Validation Accuracy')
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
-    plt.legend()
     plt.show()
