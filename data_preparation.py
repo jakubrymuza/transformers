@@ -8,6 +8,10 @@ import soundfile as sf
 from speechpy import processing,feature
 import scipy.io.wavfile as wav
 
+FREQ = 16000
+PERC = 10
+
+# generates and saves preprocessed data files
 def gen_files(train_dir):
     if not os.path.exists('data'):
         os.mkdir('data')
@@ -23,8 +27,8 @@ def gen_files(train_dir):
     validation_list = get_validation_list(train_dir)
     training_list = get_test_val_lists(train_dir,validation_list)
 
-    X_train, y_train = create_sets(training_list, classes,train_dir)
-    X_val, y_val = create_sets(validation_list, classes,train_dir)
+    X_train, y_train = create_sets(training_list, classes, train_dir)
+    X_val, y_val = create_sets(validation_list, classes, train_dir)
 
     np.save("data/X_train.npy", np.expand_dims(X_train, -1)+1.3)
     np.save("data/y_train.npy", y_train.astype(int))
@@ -32,20 +36,17 @@ def gen_files(train_dir):
     np.save('data/y_val.npy', y_val.astype(int))
 
 def make_spec(file, file_dir, flip=False, ps=False, st = 4):
-    sig, _ = librosa.load(file_dir+'/audio/'+file, sr=16000)
+    sig, _ = librosa.load(file_dir+'/audio/'+file, sr=FREQ)
     
-    if len(sig) < 16000: 
-        sig = np.pad(sig, (0,16000-len(sig)), "linear_ramp")
+    if len(sig) < FREQ: 
+        sig = np.pad(sig, (0, FREQ-len(sig)), "linear_ramp")
         
     if ps:
-        rate=16000
+        rate=FREQ
         sig = librosa.effects.pitch_shift(sig, rate, st)
         
-    D = librosa.amplitude_to_db(librosa.stft(sig[:16000], 
-                                             n_fft=512, 
-                                             hop_length=128,
-                                             center=False),
-                                             ref=np.max)
+    D = librosa.amplitude_to_db(librosa.stft(sig[:FREQ], n_fft=512, hop_length=128, center=False),
+                                ref=np.max)
     S = librosa.feature.melspectrogram(S=D, n_mels=85).T
     
     if flip:
@@ -56,20 +57,20 @@ def make_spec(file, file_dir, flip=False, ps=False, st = 4):
 def create_silence(train_dir):
     for file in os.listdir(os.path.join(train_dir,"_background_noise_/")):
         if ".wav" in file:
-            sig, _ = librosa.load(os.path.join(train_dir,"_background_noise_/")+file, sr = 16000) 
-            sig_arr = np.split(sig, np.arange(16000, len(sig), 16000))
+            sig, _ = librosa.load(os.path.join(train_dir,"_background_noise_/")+file, sr = FREQ) 
+            sig_arr = np.split(sig, np.arange(FREQ, len(sig), FREQ))
             if not os.path.exists(train_dir+"/audio/silence/"):
                 os.makedirs(train_dir+"/audio/silence/")
             for ind, arr in enumerate(sig_arr):
                 file_name = "frag%d" %ind + "_%s" %file
-                sf.write(train_dir+"/audio/silence/"+file_name, arr, 16000)
+                sf.write(train_dir+"/audio/silence/"+file_name, arr, FREQ)
                 
 def get_validation_list(train_dir):
     with open(train_dir+"/validation_list.txt") as val_list:
         validation_list = [row[0] for row in csv.reader(val_list)]
 
     for i, file in enumerate(os.listdir(train_dir+"/audio/silence/")):
-        if i%10 == 0:
+        if i % PERC== 0:
             validation_list.append("silence/"+file)
     return validation_list
 
