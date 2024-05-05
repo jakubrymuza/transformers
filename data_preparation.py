@@ -12,7 +12,7 @@ FREQ = 16000
 PERC = 10
 
 # generates and saves preprocessed data files
-def gen_files(train_dir):
+def gen_files(train_dir, method = 'spec', folder_name = 'data'):
     if not os.path.exists('data'):
         os.mkdir('data')
 
@@ -27,13 +27,13 @@ def gen_files(train_dir):
     validation_list = get_validation_list(train_dir)
     training_list = get_test_val_lists(train_dir,validation_list)
 
-    X_train, y_train = create_sets(training_list, classes, train_dir)
-    X_val, y_val = create_sets(validation_list, classes, train_dir)
+    X_train, y_train = create_sets(training_list, classes, train_dir, method = method)
+    X_val, y_val = create_sets(validation_list, classes, train_dir, method = method)
 
-    np.save("data/X_train.npy", np.expand_dims(X_train, -1)+1.3)
-    np.save("data/y_train.npy", y_train.astype(int))
-    np.save('data/X_val.npy', np.expand_dims(X_val, -1)+1.3)
-    np.save('data/y_val.npy', y_val.astype(int))
+    np.save(f"{folder_name}/X_train.npy", np.expand_dims(X_train, -1)+1.3)
+    np.save(f"{folder_name}/y_train.npy", y_train.astype(int))
+    np.save(f"{folder_name}/X_val.npy", np.expand_dims(X_val, -1)+1.3)
+    np.save(f"{folder_name}/y_val.npy", y_val.astype(int))
 
 def make_spec(file, file_dir, flip=False, ps=False, st = 4):
     sig, _ = librosa.load(file_dir+'/audio/'+file, sr=FREQ)
