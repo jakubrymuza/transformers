@@ -1,18 +1,14 @@
 import numpy as np 
-import pandas as pd 
 import os
 import csv
+import shutil
 import librosa
 import librosa.display
-import matplotlib.pyplot as plt
 import soundfile as sf
 from speechpy import processing,feature
 import scipy.io.wavfile as wav
 
-
 def make_spec(file, file_dir, flip=False, ps=False, st = 4):
-
-    
     sig, sr = librosa.load(file_dir+'/audio/'+file, sr=16000)
     
     if len(sig) < 16000: 
@@ -26,7 +22,7 @@ def make_spec(file, file_dir, flip=False, ps=False, st = 4):
                                              n_fft=512, 
                                              hop_length=128,
                                              center=False),
-                               ref=np.max)
+                                             ref=np.max)
     S = librosa.feature.melspectrogram(S=D, n_mels=85).T
     
     if flip:
@@ -34,9 +30,7 @@ def make_spec(file, file_dir, flip=False, ps=False, st = 4):
     
     return S.astype(np.float32)
 
-
 def split_arr(arr):
-
     return np.split(arr, np.arange(16000, len(arr), 16000))
 
 
@@ -77,7 +71,6 @@ def get_test_val_lists(train_dir, validation_list):
     # validation_list = list(set(validation_list).intersection(all_files_list))
     return training_list
 def get_all_classes(train_dir):
-    
     classes = os.listdir(os.path.join(train_dir,'audio'))
     
     if "_background_noise_" in classes:
@@ -99,8 +92,8 @@ def create_sets(file_list,all_classes,train_dir,method = 'spec'):
         X_array = np.zeros([len(file_list), 97, 80])
     y_array = np.zeros([len(file_list)])
     for ind, file in enumerate(file_list):
-        if ind%2000 == 0:
-            print(ind, file)
+        # if ind%2000 == 0:
+        #     print(ind, file)
         if method == 'spec':
             X_array[ind] = make_spec(file,train_dir)
         elif method == 'fbank':
@@ -116,14 +109,6 @@ def compute_fbank(file):
     sr, signal = wav.read(file)
     
     signal_preemphasized = processing.preemphasis(signal, cof=0.98)
-
-    frames = processing.stack_frames(signal_preemphasized, sampling_frequency=sr,
-                                     frame_length=0.025,
-                                     frame_stride=0.010,
-                                     zero_padding=True)
-
-
-    power_spectrum = processing.power_spectrum(frames, fft_points=512)
     
     log_fbank = feature.lmfe(signal_preemphasized,sampling_frequency=sr,frame_length=0.025,
                         frame_stride=0.010,num_filters=80,
@@ -144,3 +129,26 @@ def wav_padding(wav_data, wav_max_len, feature_dim):
     new_wav_data_lst[:wav_data.shape[0], :] = wav_data
 
     return new_wav_data_lst
+
+def gen_files(train_dir):
+    if not os.path.exists('data'):
+        os.mkdir('data')
+
+    background_noise_dir = os.path.join(train_dir, "audio", "_background_noise_")
+
+    if os.path.exists(background_noise_dir):
+        shutil.move(background_noise_dir, train_dir)
+
+    create_silence(train_dir)
+    classes = get_all_classes(train_dir)
+
+    validation_list = get_validation_list(train_dir)
+    training_list = get_test_val_lists(train_dir,validation_list)
+
+    X_train, y_train = create_sets(training_list, classes,train_dir)
+    X_val, y_val = create_sets(validation_list, classes,train_dir)
+
+    np.save("data/X_train.npy", np.expand_dims(X_train, -1)+1.3)
+    np.save("data/y_train.npy", y_train.astype(int))
+    np.save('data/X_val.npy', np.expand_dims(X_val, -1)+1.3)
+    np.save('data/y_val.npy', y_val.astype(int))

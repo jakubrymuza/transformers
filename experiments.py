@@ -40,9 +40,6 @@ def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer,
     if should_print:
         print_err(total_loss_all)
         
-        # print("Train eval:")
-        # evaluate(model = model, dataset = train_data, device = device, all_classes = all_classes, trans_mode = trans_mode)
-        
         print("Test eval:")
         _, _, acc = evaluate(model = model, dataset = test_data, device = device, all_classes = all_classes, trans_mode = trans_mode)
         accs.append(acc)
@@ -73,9 +70,6 @@ def run_network(model, criterion, optimizer, dataloader, num_epochs, device, sch
             
             outputs = model(inputs)
 
-            if(trans_mode):
-                labels = labels.long()
-
             loss = criterion(outputs, labels)
 
             loss.backward()
@@ -85,6 +79,7 @@ def run_network(model, criterion, optimizer, dataloader, num_epochs, device, sch
         if (scheduler is not None):
             scheduler.step()
         
+        # stats per epoch
         total_loss.append(loss)
         if should_print:
             print(f"Epoch [{epoch+1}/{num_epochs}], Train loss: {loss / len(dataloader):.4f}")
@@ -130,9 +125,6 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
             labels = labels.cpu()
             outputs = outputs.cpu()
 
-            if(trans_mode):
-                _, outputs = torch.max(outputs, 1)
-
             _, predicted = torch.max(outputs, 1)
             y_true.extend(labels.numpy())
             y_pred.extend(predicted.numpy())
@@ -167,8 +159,8 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
 def plot_accs(accs):
     epochs = range(1, len(accs) + 1)
 
-    plt.plot(epochs, accs, 'bo', label='Training accuracy')
-    plt.title('Training Accuracy')
+    plt.plot(epochs, accs, 'bo')
+    plt.title('Validation Accuracy')
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
     plt.legend()
