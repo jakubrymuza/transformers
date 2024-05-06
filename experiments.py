@@ -260,8 +260,6 @@ def evaluate_2_models(model_silence,model_audio, dataset, device, all_classes, t
 
     target_names = [CLASSES[cls] for cls in range(12)]
     
-    
-
     acc = accuracy_score(y_true = y_true, y_pred = y_pred)
     if long_mode:
         print(classification_report(y_true = y_true, 
