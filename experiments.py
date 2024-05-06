@@ -20,13 +20,13 @@ CLASSES = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go'
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
-def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer, batch_size, all_classes, device, scheduler = None, should_print = True, random_seed=RANDOM_SEED, trans_mode = False, transform = []):
+def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer, batch_size, all_classes, device, scheduler = None, should_print = True, random_seed=RANDOM_SEED, trans_mode = False, transform = [], convert_unknown=True):
     generator = torch.Generator().manual_seed(random_seed)
     random.seed(random_seed)
     torch.manual_seed(random_seed)
     
     dataloader_train = DataLoader(train_data, batch_size = batch_size, shuffle = True, generator = generator, num_workers = NUM_WORKERS)
-
+    
     model, total_loss_all, accs = run_network(model = model, 
                                         optimizer = optimizer, 
                                         criterion = criterion, 
@@ -38,7 +38,8 @@ def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer,
                                         valid_data = test_data,
                                         scheduler = scheduler,
                                         trans_mode = trans_mode,
-                                        transform = transform,
+                                        transform = transform, 
+                                        convert_unknown=convert_unknown
                                         )
     
     # evaluating model
@@ -46,15 +47,15 @@ def perform_test(model, train_data, test_data, num_epochs, criterion, optimizer,
         print_err(total_loss_all)
         
         print("Test eval:")
-        _, _, acc = evaluate(model = model, dataset = test_data, device = device, all_classes = all_classes, trans_mode = trans_mode)
+        _, _, acc = evaluate(model = model, dataset = test_data, device = device, all_classes = all_classes, trans_mode = trans_mode, convert_unknown=convert_unknown)
         accs.append(acc)
 
         plot_accs(accs)
         
         
-    return model,
+    return model
 
-def run_network(model, criterion, optimizer, dataloader, num_epochs, device, scheduler, valid_data, all_classes, trans_mode, transform, should_print = True, test_frequency = 1):
+def run_network(model, criterion, optimizer, dataloader, num_epochs, device, scheduler, valid_data, all_classes, trans_mode, transform, should_print = True, test_frequency = 1, convert_unknown=True):
     total_loss = []
     accs = []
     model.train()
@@ -79,6 +80,7 @@ def run_network(model, criterion, optimizer, dataloader, num_epochs, device, sch
             
             outputs = model(inputs)
 
+
             loss = criterion(outputs, labels)
 
             loss.backward()
@@ -94,7 +96,8 @@ def run_network(model, criterion, optimizer, dataloader, num_epochs, device, sch
             print(f"Epoch [{epoch+1}/{num_epochs}], Train loss: {loss / len(dataloader):.4f}")
 
             if (epoch + 1) % test_frequency == 0 and (epoch + 1) < num_epochs:
-                _, _, acc = evaluate(model = model, dataset = valid_data, device = device, long_mode = False, all_classes = all_classes, trans_mode = trans_mode)
+                
+                _, _, acc = evaluate(model = model, dataset = valid_data, device = device, long_mode = False, all_classes = all_classes, trans_mode = trans_mode, convert_unknown=convert_unknown)
                 accs.append(acc)
                 print(f"Test accuracy: {acc}")
                 
@@ -114,7 +117,7 @@ def print_err(total_loss):
     plt.ylabel('error')
     plt.title('error in each epoch')
     
-def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
+def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True, convert_unknown=True):
     dataloader = DataLoader(dataset, batch_size = 100, num_workers = NUM_WORKERS)
     model.eval()
     y_true = []
@@ -137,20 +140,23 @@ def evaluate(model, dataset, device, all_classes, trans_mode, long_mode = True):
             _, predicted = torch.max(outputs, 1)
             y_true.extend(labels.numpy())
             y_pred.extend(predicted.numpy())
-
-    # converting classes
-    for key, value in all_classes.items():
-        if value not in VAL_CLASSES:
-            all_classes[key] = "unknown"
-
     
-    y_true = np.array([all_classes[round(num)] for num in y_true])
-    y_pred = np.array([all_classes[round(num)] for num in y_pred])
+    # converting classes
+    if convert_unknown:
+        for key, value in all_classes.items():
+            if value not in VAL_CLASSES:
+                all_classes[key] = "unknown"
+    
+        y_true = np.array([all_classes[round(num)] for num in y_true])
+        y_pred = np.array([all_classes[round(num)] for num in y_pred])
 
-    y_true = [CLASSES.index(name) for name in y_true]
-    y_pred = [CLASSES.index(name) for name in y_pred]
+        y_true = [CLASSES.index(name) for name in y_true]
+        y_pred = [CLASSES.index(name) for name in y_pred]
 
-    target_names = [CLASSES[cls] for cls in range(12)]
+        target_names = [CLASSES[cls] for cls in range(12)]
+    else:
+        target_names = all_classes.values()
+    
 
     acc = accuracy_score(y_true = y_true, y_pred = y_pred)
     if long_mode:
@@ -206,6 +212,71 @@ def evaluate_test(model, dataset, device, all_classes, trans_mode=False):
                     writer.writerow({'fname': file_name, 'label': predicted_word})
             
     return y_pred
+
+def evaluate_2_models(model_silence,model_audio, dataset, device, all_classes, trans_mode=False, long_mode = True, convert_unknown=True):
+    dataloader = DataLoader(dataset, batch_size = 100, num_workers = NUM_WORKERS)
+    model_silence.eval()
+    model_audio.eval()
+    y_true = []
+    y_pred = []
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            if(trans_mode):
+                inputs = inputs.permute(0, 2, 1)
+
+            if device == torch.device('cuda'):
+                inputs = inputs.cuda()
+                labels = labels.cuda()
+
+            outputs_silence = model_silence(inputs)
+            _, predicted_silence = torch.max(outputs_silence, 1)
+
+            outputs_audio = model_audio(inputs[predicted_silence==0])
+            _, predicted_audio = torch.max(outputs_audio, 1)
+            predicted_audio[predicted_audio>=21]+=1
+            
+            predicted = torch.tensor(predicted_silence)
+        
+            predicted[predicted_silence==0] = predicted_audio
+            predicted[predicted_silence==1] = 21
+            
+            labels = labels.cpu()
+            predicted = predicted.cpu()
+
+            
+            y_true.extend(labels.numpy())
+            y_pred.extend(predicted.numpy())
+    
+    # converting classes
+    for key, value in all_classes.items():
+        if value not in VAL_CLASSES:
+            all_classes[key] = "unknown"
+
+    y_true = np.array([all_classes[round(num)] for num in y_true])
+    y_pred = np.array([all_classes[round(num)] for num in y_pred])
+
+    y_true = [CLASSES.index(name) for name in y_true]
+    y_pred = [CLASSES.index(name) for name in y_pred]
+
+    target_names = [CLASSES[cls] for cls in range(12)]
+    
+    
+
+    acc = accuracy_score(y_true = y_true, y_pred = y_pred)
+    if long_mode:
+        print(classification_report(y_true = y_true, 
+                                    y_pred = y_pred, 
+                                    target_names = target_names,
+                                    digits=4))
+
+        cm = confusion_matrix(y_true = y_true, y_pred = y_pred)
+            
+        disp = ConfusionMatrixDisplay(confusion_matrix = cm, display_labels = target_names)
+        disp.plot(xticks_rotation = 'vertical')  
+        plt.title('Confusion Matrix')
+        plt.show()
+        
+    return y_pred, y_true, acc
 
 class CustomDataset(Dataset):
     def __init__(self, X, file_names):
