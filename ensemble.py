@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, accuracy_score
 from torch.utils.data import DataLoader
+import csv
 
 NUM_WORKERS = 0
 
@@ -85,3 +86,38 @@ def evaluate_ensemble(models, dataset, device, all_classes, long_mode = True):
         print(f"Test accuracy: {acc}")
         
     return y_pred, y_true
+
+
+def evaluate_ensemble_test(models, dataset, device, all_classes):
+    dataloader = DataLoader(dataset, batch_size = 100, num_workers = NUM_WORKERS)
+    for model, is_trans in models:
+        model.eval()
+    y_true = []
+    y_pred = []
+    # converting classes
+    for key, value in all_classes.items():
+        if value not in VAL_CLASSES:
+            all_classes[key] = "unknown"
+            
+    with open('outputs/ensamble_output.csv', 'w', newline='') as csvfile:
+        
+        fieldnames = ['fname', 'label']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader() 
+        with torch.no_grad():
+            for inputs, file_names in dataloader:
+                if device == torch.device('cuda'):
+                    inputs = inputs.cuda()
+
+                outputs = ensemble(models,torch.tensor(inputs).float().transpose(2, 1))
+
+                outputs = outputs.cpu()
+
+                _, predicted = torch.max(outputs, 1)
+
+                predicted = predicted.numpy()
+                
+                for num,file_name in zip(predicted,file_names):
+                    predicted_word = all_classes[num]
+                    y_pred.append(predicted_word)
+                    writer.writerow({'fname': file_name, 'label': predicted_word})
