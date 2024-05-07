@@ -33,6 +33,12 @@ def gen_files(train_dir, folder_name = 'data'):
     np.save(f"{folder_name}/X_val.npy", np.expand_dims(X_val, -1)+1.3)
     np.save(f"{folder_name}/y_val.npy", y_val.astype(int))
 
+def gen_test_files(test_dir, folder_name = 'data'):
+    file_list = get_test_list(test_dir)
+    X_test, test_file_names=create_test_set(file_list,test_dir)
+    np.save(f"{folder_name}/X_test.npy", np.expand_dims(X_test, -1)+1.3)
+    np.savetxt(f"{folder_name}/test_file_names.txt", test_file_names, fmt='%s')
+
 def make_spec(file, file_dir, flip=False, ps=False, st = 4):
     sig, _ = librosa.load(file_dir+'/audio/'+file, sr=FREQ)
     
@@ -108,3 +114,19 @@ def create_sets(file_list, all_classes, train_dir):
 
     return X_array, y_array
 
+def get_test_list(test_dir):
+    test_list  = []
+     
+    files = os.listdir(os.path.join(test_dir,'audio'))
+    for _, f in enumerate(files):
+        test_list.append(f)
+
+    return test_list
+def create_test_set(file_list, test_dir):
+    X_array = np.zeros([len(file_list), 122, 85])
+    file_names = []
+    for ind, file in enumerate(file_list):
+        X_array[ind] = make_spec(file,test_dir)
+
+        file_names.append(file)
+    return X_array, file_names
